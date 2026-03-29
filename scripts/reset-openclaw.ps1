@@ -212,11 +212,11 @@ function Configure-Model {
     Info "Configuring Aliyun Bailian model..."
     
     Info "Setting default model: Aliyun Bailian/qwen3.5-plus"
-    openclaw config set model.default "Aliyun Bailian/qwen3.5-plus" 2>&1 | ForEach-Object { Write-Host "  $_" }
+    openclaw config set models.default "Aliyun Bailian/qwen3.5-plus" 2>&1 | ForEach-Object { Write-Host "  $_" }
     Log "Default model set"
     
     Info "Setting current session model: Aliyun Bailian/qwen3.5-plus"
-    openclaw config set model "Aliyun Bailian/qwen3.5-plus" 2>&1 | ForEach-Object { Write-Host "  $_" }
+    openclaw config set models.current "Aliyun Bailian/qwen3.5-plus" 2>&1 | ForEach-Object { Write-Host "  $_" }
     Log "Current session model set"
     
     Write-Host ""
@@ -265,11 +265,11 @@ function Verify-Config {
     
     Write-Host "[Model Config]" -ForegroundColor Yellow
     Info "Default model:"
-    openclaw config get model.default 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
+    openclaw config get models.default 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
     
     Write-Host ""
     Info "Current session model:"
-    openclaw config get model 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
+    openclaw config get models.current 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
     
     Write-Host ""
     Write-Host "[Reasoning Settings]" -ForegroundColor Yellow
