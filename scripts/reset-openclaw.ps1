@@ -211,13 +211,9 @@ function Clear-Memory {
 function Configure-Model {
     Info "Configuring Aliyun Bailian model..."
     
-    Info "Setting default model: Aliyun Bailian/qwen3.5-plus"
-    openclaw config set models.default "Aliyun Bailian/qwen3.5-plus" 2>&1 | ForEach-Object { Write-Host "  $_" }
+    Info "Setting default model: qwen3.5-plus"
+    openclaw config set agents.defaults.model.primary "qwen3.5-plus" 2>&1 | ForEach-Object { Write-Host "  $_" }
     Log "Default model set"
-    
-    Info "Setting current session model: Aliyun Bailian/qwen3.5-plus"
-    openclaw config set models.current "Aliyun Bailian/qwen3.5-plus" 2>&1 | ForEach-Object { Write-Host "  $_" }
-    Log "Current session model set"
     
     Write-Host ""
 }
@@ -225,17 +221,9 @@ function Configure-Model {
 function Enable-Reasoning {
     Info "Configuring reasoning settings..."
     
-    Info "Enabling reasoning"
-    openclaw config set thinking.enabled true 2>&1 | ForEach-Object { Write-Host "  $_" }
-    Log "Reasoning: enabled"
-    
-    Info "Setting reasoning level: high"
-    openclaw config set thinking.level "high" 2>&1 | ForEach-Object { Write-Host "  $_" }
-    Log "Reasoning level: high"
-    
-    Info "Setting reasoning mode: enabled"
-    openclaw config set thinking.mode "enabled" 2>&1 | ForEach-Object { Write-Host "  $_" }
-    Log "Reasoning mode: enabled"
+    Info "Setting default reasoning level: high"
+    openclaw config set agents.defaults.thinkingDefault "high" 2>&1 | ForEach-Object { Write-Host "  $_" }
+    Log "Reasoning default: high"
     
     Write-Host ""
 }
@@ -265,16 +253,12 @@ function Verify-Config {
     
     Write-Host "[Model Config]" -ForegroundColor Yellow
     Info "Default model:"
-    openclaw config get models.default 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
-    
-    Write-Host ""
-    Info "Current session model:"
-    openclaw config get models.current 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
+    openclaw config get agents.defaults.model.primary 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
     
     Write-Host ""
     Write-Host "[Reasoning Settings]" -ForegroundColor Yellow
-    Info "Reasoning config:"
-    openclaw config get thinking 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
+    Info "Reasoning default:"
+    openclaw config get agents.defaults.thinkingDefault 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
     
     Write-Host ""
     Write-Host "[Telegram Config]" -ForegroundColor Yellow
