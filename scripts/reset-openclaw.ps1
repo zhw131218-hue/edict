@@ -1,368 +1,328 @@
-# ══════════════════════════════════════════════════════════════
-# OpenClaw 清理与配置脚本 (Windows) - 增强版
-# 功能：清除记忆数据 + 保留 TG 配置 + 配置代理 + 阿里云百炼模型
-# 编码：UTF-8 with BOM (Windows PowerShell 兼容)
-# ══════════════════════════════════════════════════════════════
+# OpenClaw Reset and Configuration Script (Windows)
+# Function: Clear memory + Keep TG config + Configure proxy + Aliyun model
+# Encoding: UTF-8 with BOM
+
 #Requires -Version 5.1
 $ErrorActionPreference = "Stop"
-
-# 确保 UTF-8 输出
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 function Write-Banner {
     Write-Host ""
-    Write-Host "╔══════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║  🦞 OpenClaw 清理与配置脚本 (增强版)             ║" -ForegroundColor Cyan
-    Write-Host "║   清除记忆 + 保留 TG + 配置代理 + 阿里云百炼     ║" -ForegroundColor Cyan
-    Write-Host "╚══════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "=========================================" -ForegroundColor Cyan
+    Write-Host "  OpenClaw Reset & Config Script" -ForegroundColor Cyan
+    Write-Host "  Clear Memory + Keep TG + Aliyun Model" -ForegroundColor Cyan
+    Write-Host "=========================================" -ForegroundColor Cyan
     Write-Host ""
 }
 
-function Log   { param($msg) Write-Host "✅ $msg" -ForegroundColor Green }
-function Warn  { param($msg) Write-Host "⚠️  $msg" -ForegroundColor Yellow }
-function Error { param($msg) Write-Host "❌ $msg" -ForegroundColor Red }
-function Info  { param($msg) Write-Host "ℹ️  $msg" -ForegroundColor Blue }
+function Log   { param($msg) Write-Host "[OK] $msg" -ForegroundColor Green }
+function Warn  { param($msg) Write-Host "[WARN] $msg" -ForegroundColor Yellow }
+function Error { param($msg) Write-Host "[ERROR] $msg" -ForegroundColor Red }
+function Info  { param($msg) Write-Host "[INFO] $msg" -ForegroundColor Blue }
 
-# ── Step 0: 检查 OpenClaw 是否安装 ──
 function Check-OpenClaw {
-    Info "检查 OpenClaw 安装状态..."
-    
+    Info "Checking OpenClaw installation..."
     $oc = Get-Command openclaw -ErrorAction SilentlyContinue
     if (-not $oc) {
-        Error "未找到 openclaw CLI。请先安装 OpenClaw。"
+        Error "openclaw CLI not found. Please install OpenClaw first."
         exit 1
     }
-    Log "OpenClaw CLI: OK ($($oc.Source))"
+    Log "OpenClaw CLI: OK"
 }
 
-# ── Step 0.5: 配置代理 ──
 function Configure-Proxy {
-    Info "配置代理环境..."
+    Info "Configuring proxy..."
     Write-Host ""
     
-    # 检测系统代理
-    $systemProxy = [System.Net.WebRequest]::DefaultWebProxy
+    # Try to detect system proxy
     $proxyAddress = $null
     $proxyPort = $null
     
     try {
-        # 尝试从注册表读取 IE/系统代理
         $proxyServer = Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name "ProxyServer" -ErrorAction SilentlyContinue
         if ($proxyServer -and $proxyServer.ProxyServer) {
             $proxyParts = $proxyServer.ProxyServer -split ":"
             if ($proxyParts.Count -ge 2) {
                 $proxyAddress = $proxyParts[0]
                 $proxyPort = $proxyParts[1]
-                Info "检测到系统代理：$proxyAddress`:$proxyPort"
+                Info "Detected system proxy: $proxyAddress`:$proxyPort"
             }
         }
     } catch {
-        Info "无法自动检测系统代理"
+        Info "Cannot auto-detect system proxy"
     }
     
     Write-Host ""
-    Write-Host "══════════════════════════════════════════════════" -ForegroundColor Cyan
-    Write-Host "  🌐 代理配置" -ForegroundColor Cyan
-    Write-Host "══════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "=== Proxy Configuration ===" -ForegroundColor Cyan
     Write-Host ""
     
     if ($proxyAddress -and $proxyPort) {
-        Info "已检测到系统代理：$proxyAddress`:$proxyPort"
-        $useSystemProxy = Read-Host "是否使用系统代理？(y/n)"
+        Info "System proxy detected: $proxyAddress`:$proxyPort"
+        $useSystemProxy = Read-Host "Use system proxy? (y/n)"
         
         if ($useSystemProxy -eq "y" -or $useSystemProxy -eq "Y" -or [string]::IsNullOrEmpty($useSystemProxy)) {
-            # 设置环境变量
             $env:HTTP_PROXY = "http://$proxyAddress`:$proxyPort"
             $env:HTTPS_PROXY = "http://$proxyAddress`:$proxyPort"
             $env:NO_PROXY = "localhost,127.0.0.1"
             
-            # 设置 Git 代理
             git config --global http.proxy "http://$proxyAddress`:$proxyPort" 2>$null
             git config --global https.proxy "http://$proxyAddress`:$proxyPort" 2>$null
             
-            Log "系统代理已配置"
+            Log "System proxy configured"
             Log "HTTP_PROXY: $env:HTTP_PROXY"
             Log "HTTPS_PROXY: $env:HTTPS_PROXY"
             return
         }
     }
     
-    # 手动输入代理
     Write-Host ""
-    Info "请输入代理服务器地址（如果不需要代理，直接回车跳过）"
-    $proxyInput = Read-Host "代理地址 (例：127.0.0.1)"
+    Info "Enter proxy address (press Enter to skip)"
+    $proxyInput = Read-Host "Proxy address (e.g., 127.0.0.1)"
     
     if (-not [string]::IsNullOrEmpty($proxyInput)) {
-        $proxyPortInput = Read-Host "代理端口 (例：7890)"
+        $proxyPortInput = Read-Host "Proxy port (e.g., 7890)"
         
         if (-not [string]::IsNullOrEmpty($proxyPortInput)) {
-            # 设置环境变量
             $env:HTTP_PROXY = "http://$proxyInput`:$proxyPortInput"
             $env:HTTPS_PROXY = "http://$proxyInput`:$proxyPortInput"
             $env:NO_PROXY = "localhost,127.0.0.1"
             
-            # 设置 Git 代理
             git config --global http.proxy "http://$proxyInput`:$proxyPortInput" 2>$null
             git config --global https.proxy "http://$proxyInput`:$proxyPortInput" 2>$null
             
-            Log "代理已配置"
+            Log "Proxy configured"
             Log "HTTP_PROXY: $env:HTTP_PROXY"
             Log "HTTPS_PROXY: $env:HTTPS_PROXY"
         }
     } else {
-        Info "跳过代理配置"
+        Info "Skip proxy configuration"
     }
     
     Write-Host ""
 }
 
-# ── Step 1: 停止 Gateway ──
 function Stop-Gateway {
-    Info "停止 OpenClaw Gateway..."
+    Info "Stopping OpenClaw Gateway..."
     
-    # 查找并终止所有 openclaw 相关进程
     $processes = Get-Process | Where-Object { $_.ProcessName -like "*node*" -or $_.ProcessName -like "*openclaw*" }
     if ($processes) {
         $processes | ForEach-Object {
-            Info "终止进程：$($_.ProcessName) (PID: $($_.Id))"
+            Info "Stopping process: $($_.ProcessName) (PID: $($_.Id))"
             Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
         }
         Start-Sleep -Seconds 2
-        Log "Gateway 已停止"
+        Log "Gateway stopped"
     } else {
-        Info "未发现运行中的 Gateway 进程"
+        Info "No running Gateway process found"
     }
 }
 
-# ── Step 2: 备份 TG 配置 ──
 function Backup-TG-Config {
-    Info "备份 Telegram 配置..."
+    Info "Backing up Telegram configuration..."
     
     $ocHome = Join-Path $env:USERPROFILE ".openclaw"
     $configFile = Join-Path $ocHome "openclaw.json"
     $backupFile = Join-Path $ocHome "openclaw.json.tg.backup"
     
     if (Test-Path $configFile) {
-        # 读取配置
         $config = Get-Content $configFile -Raw -Encoding UTF8 | ConvertFrom-Json
         
-        # 检查是否有 Telegram 配置
         $hasTelegram = $false
         $tgConfig = @{}
         
         if ($config.channels -and $config.channels.telegram) {
             $hasTelegram = $true
             $tgConfig.telegram = $config.channels.telegram
-            Info "检测到 Telegram 渠道配置"
+            Info "Telegram channel config detected"
         }
         
         if ($config.deliveryContext -and $config.deliveryContext.telegram) {
             $tgConfig.deliveryContext = $config.deliveryContext.telegram
-            Info "检测到 Telegram 投递上下文配置"
+            Info "Telegram delivery context detected"
         }
         
         if ($hasTelegram) {
-            # 保存备份
             $tgConfig | ConvertTo-Json -Depth 10 | Set-Content $backupFile -Encoding UTF8
-            Log "Telegram 配置已备份到：$backupFile"
-            Info "⚠️  此备份文件在安装完成后需要恢复"
+            Log "Telegram config backed up to: $backupFile"
         } else {
-            Info "未检测到 Telegram 配置"
+            Info "No Telegram config detected"
         }
     }
     
     Write-Host ""
 }
 
-# ── Step 3: 清除记忆数据（保留 TG 配置） ──
 function Clear-Memory {
-    Info "清除 OpenClaw 记忆数据（保留 Telegram 配置）..."
+    Info "Clearing OpenClaw memory (keeping Telegram config)..."
     
     $ocHome = Join-Path $env:USERPROFILE ".openclaw"
     
-    # 清除 MEMORY.md
+    # Clear MEMORY.md
     $memoryMd = Join-Path $ocHome "MEMORY.md"
     if (Test-Path $memoryMd) {
-        Info "删除：MEMORY.md"
+        Info "Deleting: MEMORY.md"
         Remove-Item -Path $memoryMd -Force
-        Log "已删除：MEMORY.md"
+        Log "Deleted: MEMORY.md"
     } else {
-        Info "MEMORY.md 不存在 (跳过)"
+        Info "MEMORY.md not found (skip)"
     }
     
-    # 清除 memory 目录
+    # Clear memory directory
     $memoryDir = Join-Path $ocHome "memory"
     if (Test-Path $memoryDir) {
-        Info "删除：memory/ 目录"
+        Info "Deleting: memory/ directory"
         Remove-Item -Path $memoryDir -Recurse -Force
-        Log "已删除：memory/"
+        Log "Deleted: memory/"
     } else {
-        Info "memory/ 不存在 (跳过)"
+        Info "memory/ not found (skip)"
     }
     
-    # 清除 HEARTBEAT.md 内容（保留文件）
+    # Clear HEARTBEAT.md content
     $heartbeatMd = Join-Path $ocHome "HEARTBEAT.md"
     if (Test-Path $heartbeatMd) {
-        Info "清空：HEARTBEAT.md"
+        Info "Clearing: HEARTBEAT.md"
         Set-Content -Path $heartbeatMd -Value "" -Encoding UTF8
-        Log "已清空：HEARTBEAT.md"
+        Log "Cleared: HEARTBEAT.md"
     }
     
-    # 清除会话历史（保留 main agent）
+    # Clear session history (keep main agent)
     $sessionsDir = Join-Path $ocHome "agents"
     if (Test-Path $sessionsDir) {
-        Info "扫描会话目录..."
+        Info "Scanning session directory..."
         $agentDirs = Get-ChildItem -Path $sessionsDir -Directory | Where-Object { $_.Name -ne "main" }
         foreach ($agentDir in $agentDirs) {
             $sessionFiles = Get-ChildItem -Path $agentDir.FullName -Filter "*.jsonl" -ErrorAction SilentlyContinue
             foreach ($file in $sessionFiles) {
                 if ($file.Name -notlike "*main*") {
-                    Info "删除会话：$($file.Name)"
+                    Info "Deleting session: $($file.Name)"
                     Remove-Item -Path $file.FullName -Force
                 }
             }
         }
-        Log "会话历史已清理（保留 main agent）"
+        Log "Session history cleared (main agent kept)"
     }
     
-    # ⚠️ 不清除 openclaw.json（保留所有配置包括 TG）
-    Info "保留：openclaw.json (包含 Telegram Token 和 UserID)"
+    # Keep openclaw.json (with TG config)
+    Info "Keeping: openclaw.json (includes Telegram Token and UserID)"
     
     Write-Host ""
 }
 
-# ── Step 4: 配置阿里云百炼模型 ──
 function Configure-Model {
-    Info "配置阿里云百炼模型..."
+    Info "Configuring Aliyun Bailian model..."
     
-    # 设置默认模型
-    Info "设置默认模型：阿里云百炼/qwen3.5-plus"
-    openclaw config set model.default "阿里云百炼/qwen3.5-plus" 2>&1 | ForEach-Object { Write-Host "  $_" }
-    Log "默认模型已设置"
+    Info "Setting default model: Aliyun Bailian/qwen3.5-plus"
+    openclaw config set model.default "Aliyun Bailian/qwen3.5-plus" 2>&1 | ForEach-Object { Write-Host "  $_" }
+    Log "Default model set"
     
-    # 设置当前会话模型
-    Info "设置当前会话模型：阿里云百炼/qwen3.5-plus"
-    openclaw config set model "阿里云百炼/qwen3.5-plus" 2>&1 | ForEach-Object { Write-Host "  $_" }
-    Log "当前会话模型已设置"
+    Info "Setting current session model: Aliyun Bailian/qwen3.5-plus"
+    openclaw config set model "Aliyun Bailian/qwen3.5-plus" 2>&1 | ForEach-Object { Write-Host "  $_" }
+    Log "Current session model set"
     
     Write-Host ""
 }
 
-# ── Step 5: 打开推理开关 ──
 function Enable-Reasoning {
-    Info "配置推理设置..."
+    Info "Configuring reasoning settings..."
     
-    # 打开推理开关
-    Info "打开推理开关"
+    Info "Enabling reasoning"
     openclaw config set thinking.enabled true 2>&1 | ForEach-Object { Write-Host "  $_" }
-    Log "推理开关：已打开"
+    Log "Reasoning: enabled"
     
-    # 设置推理等级为 High
-    Info "设置推理等级：High"
+    Info "Setting reasoning level: high"
     openclaw config set thinking.level "high" 2>&1 | ForEach-Object { Write-Host "  $_" }
-    Log "推理等级：High"
+    Log "Reasoning level: high"
     
-    # 设置推理模式
-    Info "设置推理模式：enabled"
+    Info "Setting reasoning mode: enabled"
     openclaw config set thinking.mode "enabled" 2>&1 | ForEach-Object { Write-Host "  $_" }
-    Log "推理模式：已启用"
+    Log "Reasoning mode: enabled"
     
     Write-Host ""
 }
 
-# ── Step 6: 恢复 TG 配置 ──
 function Restore-TG-Config {
-    Info "检查 Telegram 配置..."
+    Info "Checking Telegram configuration..."
     
     $ocHome = Join-Path $env:USERPROFILE ".openclaw"
     $backupFile = Join-Path $ocHome "openclaw.json.tg.backup"
     
     if (Test-Path $backupFile) {
-        Info "Telegram 配置备份存在，无需额外操作"
-        Info "openclaw.json 已保留原始配置（包含 TG Token 和 UserID）"
-        Log "Telegram 配置：已保留"
+        Info "Telegram config backup exists, no extra action needed"
+        Info "openclaw.json kept original config (includes TG Token and UserID)"
+        Log "Telegram config: kept"
     } else {
-        Info "未找到 Telegram 配置备份（可能之前未配置）"
+        Info "No Telegram config backup found"
     }
     
     Write-Host ""
 }
 
-# ── Step 7: 验证配置 ──
 function Verify-Config {
-    Info "验证配置..."
+    Info "Verifying configuration..."
     Write-Host ""
-    Write-Host "╔══════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║  📋 配置验证结果                                  ║" -ForegroundColor Cyan
-    Write-Host "╚══════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "=== Configuration Verification ===" -ForegroundColor Cyan
     Write-Host ""
     
-    # 检查模型配置
-    Write-Host "【模型配置】" -ForegroundColor Yellow
-    Info "当前默认模型："
+    Write-Host "[Model Config]" -ForegroundColor Yellow
+    Info "Default model:"
     openclaw config get model.default 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
     
     Write-Host ""
-    Info "当前会话模型："
+    Info "Current session model:"
     openclaw config get model 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
     
     Write-Host ""
-    Write-Host "【推理设置】" -ForegroundColor Yellow
-    Info "推理配置："
+    Write-Host "[Reasoning Settings]" -ForegroundColor Yellow
+    Info "Reasoning config:"
     openclaw config get thinking 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor White }
     
     Write-Host ""
-    Write-Host "【Telegram 配置】" -ForegroundColor Yellow
+    Write-Host "[Telegram Config]" -ForegroundColor Yellow
     $ocHome = Join-Path $env:USERPROFILE ".openclaw"
     $configFile = Join-Path $ocHome "openclaw.json"
     if (Test-Path $configFile) {
         $config = Get-Content $configFile -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($config.channels -and $config.channels.telegram) {
-            Log "Telegram 渠道配置：存在"
+            Log "Telegram channel config: exists"
         } else {
-            Warn "Telegram 渠道配置：未找到"
+            Warn "Telegram channel config: not found"
         }
     }
     
     Write-Host ""
-    Log "配置验证完成！"
+    Log "Configuration verification complete!"
     Write-Host ""
 }
 
-# ── Step 8: 重启 Gateway ──
 function Restart-Gateway {
-    Info "重启 OpenClaw Gateway..."
+    Info "Restarting OpenClaw Gateway..."
     
-    # 使用 openclaw 命令重启
     openclaw gateway restart 2>&1 | ForEach-Object { Write-Host "  $_" }
     
     Start-Sleep -Seconds 5
-    Log "Gateway 已重启"
+    Log "Gateway restarted"
     
     Write-Host ""
 }
 
-# ══════════════════════════════════════════════════════════════
-# 主程序
-# ══════════════════════════════════════════════════════════════
-
+# Main Program
 Write-Banner
 
-Warn "⚠️  警告：此脚本将清除 OpenClaw 的记忆数据！"
-Warn "⚠️  但会保留以下配置："
-Warn "    - Telegram Bot Token 和 UserID"
-Warn "    - openclaw.json 中的所有配置"
-Warn "⚠️  其他记忆数据将被清除，此操作不可逆。"
+Warn "WARNING: This script will clear OpenClaw memory data!"
+Warn "But will KEEP the following:"
+Warn "  - Telegram Bot Token and UserID"
+Warn "  - All configs in openclaw.json"
+Warn "Other memory data will be cleared. This action is irreversible."
 Write-Host ""
-$confirm = Read-Host "是否继续？(输入 yes 确认)"
+$confirm = Read-Host "Continue? (type yes to confirm)"
 
 if ($confirm -ne "yes") {
-    Info "操作已取消"
+    Info "Operation cancelled"
     exit 0
 }
 
 Write-Host ""
-Info "开始执行清理与配置..."
+Info "Starting reset and configuration..."
 Write-Host ""
 
 try {
@@ -378,19 +338,19 @@ try {
     Restart-Gateway
     
     Write-Host ""
-    Write-Host "╔══════════════════════════════════════════════════╗" -ForegroundColor Green
-    Write-Host "║  ✅ OpenClaw 清理与配置完成！                     ║" -ForegroundColor Green
-    Write-Host "╚══════════════════════════════════════════════════╝" -ForegroundColor Green
+    Write-Host "=========================================" -ForegroundColor Green
+    Write-Host "  OpenClaw Reset & Config Complete!" -ForegroundColor Green
+    Write-Host "=========================================" -ForegroundColor Green
     Write-Host ""
-    Info "📋 下一步：运行三省六部安装脚本"
-    Info "命令：cd <edict 目录> && powershell -ExecutionPolicy Bypass -File .\install.ps1"
+    Info "Next step: Run Edict installation script"
+    Info "Command: cd <edict directory> && powershell -ExecutionPolicy Bypass -File .\install.ps1"
     Write-Host ""
-    Info "🎉 配置完成！现在可以安装三省六部了！"
+    Info "Configuration complete! Ready to install Edict!"
     Write-Host ""
     
 } catch {
-    Error "发生错误：$($_.Exception.Message)"
+    Error "Error occurred: $($_.Exception.Message)"
     Write-Host ""
-    Error "错误详情：$($_.ScriptStackTrace)"
+    Error "Error details: $($_.ScriptStackTrace)"
     exit 1
 }
